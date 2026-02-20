@@ -6,31 +6,25 @@ void setup() {
 
 void loop() {
 
-  int total = 0;
+  long total = 0;
 
-  for(int i=0; i<10; i++){
+  for(int i=0; i<20; i++){
     total += analogRead(sensorPin);
-    delay(10);
+    delay(5);
   }
 
-  int moisture = total / 10;
+  int moisture = total / 20;
 
-  Serial.print("Value: ");
+  Serial.print("Moisture: ");
   Serial.print(moisture);
   Serial.print("  ->  ");
 
-  if(moisture > 350)
-  {
-    Serial.println("LOW Moisture (Dry)");
-  }
-  else if(moisture > 280)
-  {
+  if(moisture > 380)
+    Serial.println("LOW Moisture");
+  else if(moisture > 300)
     Serial.println("MEDIUM Moisture");
-  }
   else
-  {
-    Serial.println("HIGH Moisture (Wet)");
-  }
+    Serial.println("HIGH Moisture");
 
-  delay(1000);
+  delay(1500);
 }
