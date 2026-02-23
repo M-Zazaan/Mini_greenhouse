@@ -2,51 +2,92 @@
 #include <LiquidCrystal_I2C.h>
 #include <DHT.h>
 
-#define DHTPIN 2
-#define DHTTYPE DHT11
+#define DHTPIN 7          // DHT data pin connected to D7
+#define DHTTYPE DHT11     // Change to DHT22 if needed
 
 DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int pumpRelay = 8;
+// Pins
+const int ldrPin = A1;
+const int relayPin = 8;   // Pump
+const int ledPin = 9;     // LED
 
-float temp;
+// Settings
+const float tempThreshold = 23.0;
+const unsigned long pumpDuration = 5000;        // 5 sec
+const unsigned long pumpInterval = 300000;      // 5 min
+
+unsigned long lastPumpTime = 0;
+unsigned long pumpStartTime = 0;
+bool pumpRunning = false;
 
 void setup() {
-  pinMode(pumpRelay, OUTPUT);
-  digitalWrite(pumpRelay, HIGH);   // relay OFF
+  pinMode(relayPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
 
-  dht.begin();
+  digitalWrite(relayPin, HIGH);  // Relay OFF (active LOW)
+  digitalWrite(ledPin, LOW);
+
   lcd.init();
   lcd.backlight();
-
-  lcd.setCursor(0,0);
-  lcd.print("System Starting");
-  delay(2000);
-  lcd.clear();
+  dht.begin();
 }
 
 void loop() {
 
-  temp = dht.readTemperature();
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
 
+  if (isnan(temperature) || isnan(humidity)) {
+    lcd.setCursor(0,0);
+    lcd.print("Sensor Error   ");
+    return;
+  }
+
+  int ldrValue = analogRead(ldrPin);
+
+  // LED control (dark = ON)
+  if (ldrValue > 600) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+
+  unsigned long currentMillis = millis();
+
+  // Pump logic
+  if (temperature >= tempThreshold) {
+
+    if (!pumpRunning && (currentMillis - lastPumpTime >= pumpInterval)) {
+      digitalWrite(relayPin, LOW);   // Pump ON
+      pumpRunning = true;
+      pumpStartTime = currentMillis;
+      lastPumpTime = currentMillis;
+    }
+
+    if (pumpRunning && (currentMillis - pumpStartTime >= pumpDuration)) {
+      digitalWrite(relayPin, HIGH);  // Pump OFF
+      pumpRunning = false;
+    }
+
+  } else {
+    digitalWrite(relayPin, HIGH);
+    pumpRunning = false;
+  }
+
+  // LCD Display
   lcd.setCursor(0,0);
-  lcd.print("Temp: ");
-  lcd.print(temp);
-  lcd.print((char)223);
-  lcd.print("C   ");
+  lcd.print("T:");
+  lcd.print(temperature);
+  lcd.print("C H:");
+  lcd.print(humidity);
+  lcd.print("%  ");
 
-  // ---- Pump Control ----
-  if(temp >= 23) {
-    digitalWrite(pumpRelay, LOW);   // ON
-    lcd.setCursor(0,1);
-    lcd.print("Pump: ON  ");
-  }
-  else if(temp <= 22) {
-    digitalWrite(pumpRelay, HIGH);  // OFF
-    lcd.setCursor(0,1);
-    lcd.print("Pump: OFF ");
-  }
+  lcd.setCursor(0,1);
+  lcd.print("Light:");
+  lcd.print(ldrValue);
+  lcd.print("   ");
 
-  delay(2000);
+  delay(500);
 }
