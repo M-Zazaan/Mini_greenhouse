@@ -8,58 +8,45 @@
 DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int ldrPin = 7;
 int pumpRelay = 8;
-int lightRelay = 9;
+
+float temp;
 
 void setup() {
-  pinMode(ldrPin, INPUT);
   pinMode(pumpRelay, OUTPUT);
-  pinMode(lightRelay, OUTPUT);
+  digitalWrite(pumpRelay, HIGH);   // relay OFF
 
-  digitalWrite(pumpRelay, HIGH);
-  digitalWrite(lightRelay, HIGH);
-
+  dht.begin();
   lcd.init();
   lcd.backlight();
 
-  dht.begin();
+  lcd.setCursor(0,0);
+  lcd.print("System Starting");
+  delay(2000);
+  lcd.clear();
 }
 
 void loop() {
 
-  float temp = dht.readTemperature();
-  float hum = dht.readHumidity();
-  int dark = digitalRead(ldrPin);
-
-  // 🌞 LIGHT CONTROL
-  if(dark == HIGH) {
-    digitalWrite(lightRelay, LOW);   // LED ON
-  } else {
-    digitalWrite(lightRelay, HIGH);  // LED OFF
-  }
-
-  // 🌡 TEMPERATURE CONTROL
-  if(temp > 28) {
-    digitalWrite(pumpRelay, LOW);   // pump ON
-  } else {
-    digitalWrite(pumpRelay, HIGH);  // pump OFF
-  }
-
-  lcd.clear();
+  temp = dht.readTemperature();
 
   lcd.setCursor(0,0);
-  lcd.print("T:");
+  lcd.print("Temp: ");
   lcd.print(temp);
-  lcd.print("C H:");
-  lcd.print(hum);
+  lcd.print((char)223);
+  lcd.print("C   ");
 
-  lcd.setCursor(0,1);
-
-  if(dark == HIGH)
-    lcd.print("Lights: ON ");
-  else
-    lcd.print("Lights: OFF");
+  // ---- Pump Control ----
+  if(temp >= 23) {
+    digitalWrite(pumpRelay, LOW);   // ON
+    lcd.setCursor(0,1);
+    lcd.print("Pump: ON  ");
+  }
+  else if(temp <= 22) {
+    digitalWrite(pumpRelay, HIGH);  // OFF
+    lcd.setCursor(0,1);
+    lcd.print("Pump: OFF ");
+  }
 
   delay(2000);
 }
