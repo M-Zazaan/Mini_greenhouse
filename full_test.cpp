@@ -1,35 +1,29 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <DHT.h>
 
-#define DHTPIN 2
-#define DHTTYPE DHT11
-
-DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int pumpRelay = 8;
-int lightRelay = 9;
-int ldrPin = 7;
+#define RELAY 8
+#define TEMP_PIN A0
+#define LDR_PIN A1
 
 float temp;
 
-unsigned long lastPumpTime = 0;
-const unsigned long pumpInterval = 300000; // 5 minutes
-const int pumpRunTime = 5000; // 5 seconds
+unsigned long previousMillis = 0;
+const long pumpInterval = 300000;   // 5 minutes
+const int pumpRunTime = 5000;       // 5 seconds
+
+bool pumpRunning = false;
+unsigned long pumpStartTime = 0;
 
 void setup() {
-  pinMode(pumpRelay, OUTPUT);
-  pinMode(lightRelay, OUTPUT);
-  pinMode(ldrPin, INPUT);
+  pinMode(RELAY, OUTPUT);
+  digitalWrite(RELAY, HIGH); // relay OFF
 
-  digitalWrite(pumpRelay, HIGH);   // OFF
-  digitalWrite(lightRelay, HIGH);  // OFF
-
-  dht.begin();
   lcd.init();
   lcd.backlight();
 
+  lcd.setCursor(0,0);
   lcd.print("System Starting");
   delay(2000);
   lcd.clear();
@@ -37,42 +31,54 @@ void setup() {
 
 void loop() {
 
-  temp = dht.readTemperature();
-  int lightState = digitalRead(ldrPin);
+  // ===== TEMPERATURE READING =====
+  int value = analogRead(TEMP_PIN);
+  float voltage = value * (5.0 / 1023.0);
+  temp = voltage * 100;   // LM35
 
-  // ===== LCD DISPLAY =====
+  // ===== LDR READING =====
+  int lightValue = analogRead(LDR_PIN);
+
+  if(lightValue < 500)  // dark condition
+    lcd.backlight();
+  else
+    lcd.noBacklight();
+
+  // ===== DISPLAY =====
   lcd.setCursor(0,0);
   lcd.print("Temp: ");
   lcd.print(temp);
   lcd.print((char)223);
-  lcd.print("C   ");
-
-  // ===== LIGHT CONTROL =====
-  if(lightState == HIGH) {   // dark
-    digitalWrite(lightRelay, LOW);   // light ON
-    lcd.setCursor(0,1);
-    lcd.print("Light: ON ");
-  }
-  else {
-    digitalWrite(lightRelay, HIGH);  // light OFF
-    lcd.setCursor(0,1);
-    lcd.print("Light: OFF");
-  }
+  lcd.print("C ");
 
   // ===== PUMP CONTROL =====
-  unsigned long currentTime = millis();
+  unsigned long currentMillis = millis();
 
   if(temp >= 23) {
 
-    if(currentTime - lastPumpTime >= pumpInterval) {
+    if(!pumpRunning && currentMillis - previousMillis >= pumpInterval) {
+      digitalWrite(RELAY, LOW); // pump ON
+      pumpRunning = true;
+      pumpStartTime = currentMillis;
 
-      digitalWrite(pumpRelay, LOW);  // pump ON
-      delay(pumpRunTime);
-      digitalWrite(pumpRelay, HIGH); // pump OFF
-
-      lastPumpTime = currentTime;
+      lcd.setCursor(0,1);
+      lcd.print("Pump: ON ");
     }
-  }
 
-  delay(2000);
+    if(pumpRunning && currentMillis - pumpStartTime >= pumpRunTime) {
+      digitalWrite(RELAY, HIGH); // pump OFF
+      pumpRunning = false;
+      previousMillis = currentMillis;
+
+      lcd.setCursor(0,1);
+      lcd.print("Pump: OFF");
+    }
+
+  } else {
+    digitalWrite(RELAY, HIGH); // ensure OFF
+    pumpRunning = false;
+
+    lcd.setCursor(0,1);
+    lcd.print("Pump: OFF");
+  }
 }
