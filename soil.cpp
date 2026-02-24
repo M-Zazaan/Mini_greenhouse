@@ -1,30 +1,13 @@
-int sensorPin = A0;
+#define PUMP_PIN 8   // Pump/Relay connected to D8
 
 void setup() {
-  Serial.begin(9600);
+  pinMode(PUMP_PIN, OUTPUT);
 }
 
 void loop() {
+  digitalWrite(PUMP_PIN, HIGH);  // Turn pump ON
+  delay(5000);                   // ON for 5 seconds
 
-  long total = 0;
-
-  for(int i=0; i<20; i++){
-    total += analogRead(sensorPin);
-    delay(5);
-  }
-
-  int moisture = total / 20;
-
-  Serial.print("Moisture: ");
-  Serial.print(moisture);
-  Serial.print("  ->  ");
-
-  if(moisture > 380)
-    Serial.println("LOW Moisture");
-  else if(moisture > 300)
-    Serial.println("MEDIUM Moisture");
-  else
-    Serial.println("HIGH Moisture");
-
-  delay(1500);
+  digitalWrite(PUMP_PIN, LOW);   // Turn pump OFF
+  delay(5000);                   // OFF for 5 seconds
 }
