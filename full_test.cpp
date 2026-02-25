@@ -6,9 +6,9 @@
 #define DHTTYPE DHT11
 
 #define soilPin 7
+#define ldrPin 6
 #define relayPump 8
 #define relayLED 9
-#define ldrPin A1
 
 DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -19,6 +19,7 @@ bool pumpCycleDone = false;
 
 void setup() {
   pinMode(soilPin, INPUT);
+  pinMode(ldrPin, INPUT);
   pinMode(relayPump, OUTPUT);
   pinMode(relayLED, OUTPUT);
 
@@ -34,18 +35,18 @@ void setup() {
 void loop() {
 
   int soilState = digitalRead(soilPin);
-  int ldrValue = analogRead(ldrPin);
+  int lightState = digitalRead(ldrPin);
 
   float temp = dht.readTemperature();
   float hum = dht.readHumidity();
 
-  // 🌙 DARK DETECTION
-  if (ldrValue < 500)   // adjust if needed
-    digitalWrite(relayLED, LOW);   // LED ON
+  // 🌙 DARK → LED ON
+  if (lightState == LOW)
+    digitalWrite(relayLED, LOW);
   else
-    digitalWrite(relayLED, HIGH);  // LED OFF
+    digitalWrite(relayLED, HIGH);
 
-  // 💧 SOIL DRY → RUN PUMP
+  // 💧 DRY SOIL → RUN PUMP
   if (soilState == 1 && !pumpCycleDone) {
 
     digitalWrite(relayPump, LOW);  // Pump ON
@@ -56,12 +57,11 @@ void loop() {
     pumpCycleDone = true;
   }
 
-  // wait 2 minutes before next cycle
   if (pumpCycleDone && millis() - previousMillis >= restInterval) {
     pumpCycleDone = false;
   }
 
-  // 🖥 LCD DISPLAY
+  // LCD DISPLAY
   lcd.clear();
 
   lcd.setCursor(0,0);
