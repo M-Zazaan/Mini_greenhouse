@@ -41,16 +41,16 @@ void loop() {
   float temp = dht.readTemperature();
   float hum = dht.readHumidity();
 
-  // ===== LIGHT CONTROL =====
-  bool isDark = false;
+ // ===== LIGHT CONTROL (FIXED LOGIC) =====
+bool isDark = false;
 
-  if (lightState == LOW) {
-    digitalWrite(relayLED, LOW);  // LED ON
-    isDark = true;
-  } else {
-    digitalWrite(relayLED, HIGH); // LED OFF
-    isDark = false;
-  }
+if (lightState == HIGH) {   // HIGH = Dark (your module behavior)
+  digitalWrite(relayLED, LOW);   // LED ON
+  isDark = true;
+} else {                    // LOW = Bright
+  digitalWrite(relayLED, HIGH);  // LED OFF
+  isDark = false;
+}
 
   // ===== PUMP CONTROL =====
   if (soilState == 1 && !pumpResting) {
