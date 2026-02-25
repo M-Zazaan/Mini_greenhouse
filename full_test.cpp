@@ -1,70 +1,87 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+#define DHTPIN 2
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
 
 #define soilPin 7
-#define relayPin 8
-#define ledPin 3
+#define relayPump 8
+#define relayLight 9
 #define ldrPin A1
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 unsigned long previousMillis = 0;
-const long restTime = 120000;   // 2 minutes
-bool pumpRunning = false;
+const long restTime = 120000; // 2 minutes
+bool pumpResting = false;
 
 void setup() {
   pinMode(soilPin, INPUT);
-  pinMode(relayPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
+  pinMode(relayPump, OUTPUT);
+  pinMode(relayLight, OUTPUT);
 
-  digitalWrite(relayPin, HIGH); // pump OFF
+  digitalWrite(relayPump, HIGH);
+  digitalWrite(relayLight, HIGH);
 
   lcd.init();
   lcd.backlight();
+  dht.begin();
 }
 
 void loop() {
 
-  // 🌙 LDR DARK DETECTION
-  int ldrValue = analogRead(ldrPin);
+  // 🌡 Read DHT11
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
 
-  if (ldrValue < 400) {
-    digitalWrite(ledPin, HIGH);   // dark
-  } else {
-    digitalWrite(ledPin, LOW);    // light
-  }
-
+  // 🌱 Soil Check
   int soilState = digitalRead(soilPin);
 
-  // DRY SOIL = LOW (adjust from module knob)
-  if (soilState == LOW && !pumpRunning) {
+  // 🌙 LDR Check
+  int ldrValue = analogRead(ldrPin);
 
-    lcd.clear();
-    lcd.print("Soil Dry");
-    lcd.setCursor(0,1);
-    lcd.print("Pump ON");
+  // ===== LCD DISPLAY =====
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("T:");
+  lcd.print(temperature);
+  lcd.print("C H:");
+  lcd.print(humidity);
 
-    digitalWrite(relayPin, LOW); // pump ON
+  lcd.setCursor(0,1);
+  if (soilState == LOW)
+    lcd.print("Soil: DRY ");
+  else
+    lcd.print("Soil: WET ");
+
+  // ===== PUMP CONTROL (SOIL ONLY) =====
+  if (soilState == LOW && !pumpResting) {
+
+    digitalWrite(relayPump, LOW); // Pump ON
     delay(7000);
+    digitalWrite(relayPump, HIGH); // Pump OFF
 
-    digitalWrite(relayPin, HIGH); // pump OFF
-    pumpRunning = true;
+    pumpResting = true;
     previousMillis = millis();
-
-    lcd.clear();
-    lcd.print("Resting...");
   }
 
-  if (pumpRunning && millis() - previousMillis >= restTime) {
-    pumpRunning = false;
+  if (pumpResting && millis() - previousMillis >= restTime) {
+    pumpResting = false;
   }
 
   if (soilState == HIGH) {
-    lcd.clear();
-    lcd.print("Soil Wet");
-    digitalWrite(relayPin, HIGH);
-    pumpRunning = false;
+    digitalWrite(relayPump, HIGH);
+    pumpResting = false;
   }
 
-  delay(500);
+  // ===== LIGHT CONTROL USING RELAY 2 =====
+  if (ldrValue < 400) {
+    digitalWrite(relayLight, LOW); // Light ON (dark)
+  } else {
+    digitalWrite(relayLight, HIGH); // Light OFF
+  }
+
+  delay(1000);
 }
